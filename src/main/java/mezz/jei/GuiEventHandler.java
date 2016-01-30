@@ -6,8 +6,6 @@ import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.inventory.Slot;
-import net.minecraft.item.ItemStack;
 
 import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
@@ -17,8 +15,11 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Mouse;
 
 import mezz.jei.gui.ItemListOverlay;
+import mezz.jei.gui.RecipeClickableArea;
 import mezz.jei.gui.RecipesGui;
+import mezz.jei.gui.TooltipRenderer;
 import mezz.jei.input.InputHandler;
+import mezz.jei.util.Translator;
 
 public class GuiEventHandler {
 
@@ -26,8 +27,12 @@ public class GuiEventHandler {
 	private ItemListOverlay itemListOverlay;
 	@Nonnull
 	private final RecipesGui recipesGui = new RecipesGui();
+	@Nonnull
+	private final String showRecipesText = Translator.translateToLocal("jei.tooltip.show.recipes");
 	@Nullable
 	private InputHandler inputHandler;
+	@Nullable
+	private GuiScreen previousGui = null;
 
 	public void setItemListOverlay(@Nullable ItemListOverlay itemListOverlay) {
 		if (this.itemListOverlay != null) {
@@ -63,8 +68,14 @@ public class GuiEventHandler {
 		if (itemListOverlay == null) {
 			return;
 		}
-		if (event.gui == null && itemListOverlay.isOpen()) {
-			itemListOverlay.close();
+		if (previousGui != event.gui) {
+			previousGui = event.gui;
+			if (itemListOverlay.isOpen()) {
+				itemListOverlay.close();
+			}
+			if (recipesGui.isOpen()) {
+				recipesGui.close();
+			}
 		}
 	}
 
@@ -106,8 +117,16 @@ public class GuiEventHandler {
 			return;
 		}
 
-		recipesGui.draw(event.mouseX, event.mouseY);
-		recipesGui.drawHovered(event.mouseX, event.mouseY);
+		if (recipesGui.isOpen()) {
+			recipesGui.draw(event.mouseX, event.mouseY);
+			recipesGui.drawHovered(event.mouseX, event.mouseY);
+		} else {
+			RecipeClickableArea clickableArea = Internal.getRecipeRegistry().getRecipeClickableArea(guiContainer);
+			if (clickableArea != null && clickableArea.checkHover(event.mouseX - guiContainer.guiLeft, event.mouseY - guiContainer.guiTop)) {
+				TooltipRenderer.drawHoveringText(guiContainer.mc, showRecipesText, event.mouseX, event.mouseY);
+			}
+		}
+
 		itemListOverlay.drawHovered(guiContainer.mc, event.mouseX, event.mouseY);
 	}
 
@@ -117,13 +136,9 @@ public class GuiEventHandler {
 			return;
 		}
 
-		Minecraft minecraft = Minecraft.getMinecraft();
-		GuiContainer guiContainer = asGuiContainer(minecraft.currentScreen);
-		if (guiContainer == null) {
-			return;
+		if (itemListOverlay.isOpen()) {
+			itemListOverlay.handleTick();
 		}
-
-		itemListOverlay.handleTick();
 	}
 
 	@SubscribeEvent
@@ -144,10 +159,11 @@ public class GuiEventHandler {
 		if (!(gui instanceof GuiContainer)) {
 			return;
 		}
+		GuiContainer guiContainer = (GuiContainer) gui;
 		if (inputHandler != null) {
 			int x = Mouse.getEventX() * gui.width / gui.mc.displayWidth;
 			int y = gui.height - Mouse.getEventY() * gui.height / gui.mc.displayHeight - 1;
-			if (inputHandler.handleMouseEvent(x, y)) {
+			if (inputHandler.handleMouseEvent(guiContainer, x, y)) {
 				event.setCanceled(true);
 			}
 		}

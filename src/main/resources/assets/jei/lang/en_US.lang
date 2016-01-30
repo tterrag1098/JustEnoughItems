@@ -1,9 +1,11 @@
 # Tooltips
 jei.tooltip.config=Config
+jei.tooltip.show.recipes=Show Recipes
 jei.tooltip.show.all.recipes=Show All Recipes
 jei.tooltip.delete.item=Click to Delete
 jei.tooltip.liquid.amount.with.capacity=%,d / %,d mB
 jei.tooltip.liquid.amount=%,d mB
+jei.tooltip.transfer=Transfer Items
 
 # Error Tooltips
 jei.tooltip.error.recipe.transfer.missing=Missing Items
@@ -16,6 +18,7 @@ jei.chat.error.command.too.long=JEI must be on the server to handle this Chat Co
 key.jei.toggleOverlay=Toggle Item List Overlay (Ctrl + )
 key.jei.showRecipe=Show Item Recipe
 key.jei.showUses=Show Item Uses
+key.jei.recipeBack=Show Previous Recipe Page
 
 # Config
 config.jei.default=Default
@@ -51,7 +54,7 @@ config.jei.advanced.itemBlacklist.comment=List of items that should not be displ
 config.jei.advanced.hideMissingModelsEnabled=Hide Missing Item Models
 config.jei.advanced.hideMissingModelsEnabled.comment=Items with missing models will be hidden from the item list.
 config.jei.advanced.debugModeEnabled=Debug Mode
-config.jei.advanced.debugModeEnabled.comment=Adds random things to help with JEI development.
+config.jei.advanced.debugModeEnabled.comment=Only useful for JEI developers, adds thousands of test items and some debug recipes.
 config.jei.advanced.deleteItemsInCheatModeEnabled=Delete Items in Cheat Mode
 config.jei.advanced.deleteItemsInCheatModeEnabled.comment=In cheat mode, drag an ItemStack over the item list and click to delete it. (requires JEI on server)
 

@@ -16,10 +16,12 @@ import net.minecraft.item.ItemStack;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
+import mezz.jei.Internal;
 import mezz.jei.config.Config;
 import mezz.jei.config.KeyBindings;
 import mezz.jei.gui.Focus;
 import mezz.jei.gui.ItemListOverlay;
+import mezz.jei.gui.RecipeClickableArea;
 import mezz.jei.gui.RecipesGui;
 import mezz.jei.util.Commands;
 import mezz.jei.util.MouseHelper;
@@ -60,12 +62,12 @@ public class InputHandler {
 		}
 	}
 
-	public boolean handleMouseEvent(int mouseX, int mouseY) {
+	public boolean handleMouseEvent(GuiContainer guiContainer, int mouseX, int mouseY) {
 		boolean cancelEvent = false;
 		if (Mouse.getEventButton() > -1) {
 			if (Mouse.getEventButtonState()) {
 				if (!clickHandled) {
-					cancelEvent = handleMouseClick(Mouse.getEventButton(), mouseX, mouseY);
+					cancelEvent = handleMouseClick(guiContainer, Mouse.getEventButton(), mouseX, mouseY);
 					clickHandled = cancelEvent;
 				}
 			} else if (clickHandled) {
@@ -87,7 +89,7 @@ public class InputHandler {
 		return false;
 	}
 
-	private boolean handleMouseClick(int mouseButton, int mouseX, int mouseY) {
+	private boolean handleMouseClick(GuiContainer guiContainer, int mouseButton, int mouseX, int mouseY) {
 		for (IMouseHandler clickable : mouseHandlers) {
 			if (clickable.handleMouseClicked(mouseX, mouseY, mouseButton)) {
 				return true;
@@ -97,6 +99,14 @@ public class InputHandler {
 		Focus focus = getFocusUnderMouseForClick(mouseX, mouseY);
 		if (focus != null && handleMouseClickedFocus(mouseButton, focus)) {
 			return true;
+		}
+
+		if (!recipesGui.isOpen()) {
+			RecipeClickableArea clickableArea = Internal.getRecipeRegistry().getRecipeClickableArea(guiContainer);
+			if (clickableArea != null && clickableArea.checkHover(mouseX - guiContainer.guiLeft, mouseY - guiContainer.guiTop)) {
+				List<String> recipeCategoryUids = clickableArea.getRecipeCategoryUids();
+				recipesGui.showCategories(recipeCategoryUids);
+			}
 		}
 
 		return recipesGui.isOpen();
@@ -191,7 +201,7 @@ public class InputHandler {
 	private boolean handleKeyDown(int eventKey) {
 		for (IKeyable keyable : keyables) {
 			if (keyable.isOpen() && keyable.hasKeyboardFocus()) {
-				if (isInventoryCloseKey(eventKey)) {
+				if (isInventoryCloseKey(eventKey) || isEnterKey(eventKey)) {
 					keyable.setKeyboardFocus(false);
 					return true;
 				} else if (keyable.onKeyPressed(eventKey)) {
@@ -204,7 +214,7 @@ public class InputHandler {
 			if (isInventoryCloseKey(eventKey) || isInventoryToggleKey(eventKey)) {
 				recipesGui.close();
 				return true;
-			} else if (eventKey == Keyboard.KEY_BACK) {
+			} else if (eventKey == KeyBindings.recipeBack.getKeyCode()) {
 				recipesGui.back();
 				return true;
 			}
@@ -224,7 +234,11 @@ public class InputHandler {
 			if (eventKey == KeyBindings.showRecipe.getKeyCode()) {
 				Focus focus = getFocusUnderMouseForKey(mouseHelper.getX(), mouseHelper.getY());
 				if (focus != null) {
-					recipesGui.showRecipes(focus);
+					if (!GuiScreen.isShiftKeyDown()) {
+						recipesGui.showRecipes(focus);
+					} else {
+						recipesGui.showUses(focus);
+					}
 					return true;
 				}
 			} else if (eventKey == KeyBindings.showUses.getKeyCode()) {
@@ -258,12 +272,15 @@ public class InputHandler {
 		return textField != null && textField.getVisible() && textField.isEnabled && textField.isFocused();
 	}
 
-	private boolean isInventoryToggleKey(int keyCode) {
+	private static boolean isInventoryToggleKey(int keyCode) {
 		return keyCode == Minecraft.getMinecraft().gameSettings.keyBindInventory.getKeyCode();
 	}
 
-	private boolean isInventoryCloseKey(int keyCode) {
+	private static boolean isInventoryCloseKey(int keyCode) {
 		return keyCode == Keyboard.KEY_ESCAPE;
 	}
 
+	private static boolean isEnterKey(int keyCode) {
+		return keyCode == Keyboard.KEY_RETURN;
+	}
 }

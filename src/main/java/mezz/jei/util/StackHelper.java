@@ -6,7 +6,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.inventory.Container;
@@ -21,20 +25,65 @@ import net.minecraftforge.fml.common.registry.GameData;
 import net.minecraftforge.oredict.OreDictionary;
 
 import mezz.jei.Internal;
+import mezz.jei.api.recipe.IStackHelper;
+import mezz.jei.gui.ingredients.IGuiIngredient;
 
-/**
- * @deprecated Use IJeiHelpers.getStackHelper()
- */
-@SuppressWarnings("deprecation")
-@Deprecated
-public class StackUtil {
-	private StackUtil() {
+public class StackHelper implements IStackHelper {
+	/**
+	 * Returns a list of items in slots that complete the recipe defined by requiredStacksList.
+	 * Returns a result that contains missingItems if there are not enough items in availableItemStacks.
+	 */
+	@Nonnull
+	public MatchingItemsResult getMatchingItems(@Nonnull List<ItemStack> availableItemStacks, @Nonnull Map<Integer, ? extends IGuiIngredient<ItemStack>> ingredientsMap) {
+		MatchingItemsResult matchingItemResult = new MatchingItemsResult();
 
+		int recipeSlotNumber = -1;
+		SortedSet<Integer> keys = new TreeSet<>(ingredientsMap.keySet());
+		for (Integer key : keys) {
+			IGuiIngredient<ItemStack> ingredient = ingredientsMap.get(key);
+			if (!ingredient.isInput()) {
+				continue;
+			}
+			recipeSlotNumber++;
+
+			List<ItemStack> requiredStacks = ingredient.getAll();
+			if (requiredStacks.isEmpty()) {
+				continue;
+			}
+
+			ItemStack matching = containsStack(availableItemStacks, requiredStacks);
+			if (matching == null) {
+				matchingItemResult.missingItems.add(key);
+			} else {
+				ItemStack matchingSplit = matching.splitStack(1);
+				if (matching.stackSize == 0) {
+					availableItemStacks.remove(matching);
+				}
+				matchingItemResult.matchingItems.put(recipeSlotNumber, matchingSplit);
+			}
+		}
+
+		return matchingItemResult;
 	}
 
-	@Deprecated
+	@Nullable
+	public Slot getSlotWithStack(@Nonnull Container container, @Nonnull Iterable<Integer> slotNumbers, @Nonnull ItemStack stack) {
+		StackHelper stackHelper = Internal.getStackHelper();
+
+		for (Integer slotNumber : slotNumbers) {
+			Slot slot = container.getSlot(slotNumber);
+			if (slot != null) {
+				ItemStack slotStack = slot.getStack();
+				if (stackHelper.isIdentical(stack, slotStack)) {
+					return slot;
+				}
+			}
+		}
+		return null;
+	}
+
 	@Nonnull
-	public static List<ItemStack> removeDuplicateItemStacks(@Nonnull Iterable<ItemStack> stacks) {
+	public List<ItemStack> removeDuplicateItemStacks(@Nonnull Iterable<ItemStack> stacks) {
 		List<ItemStack> newStacks = new ArrayList<>();
 		for (ItemStack stack : stacks) {
 			if (stack != null && containsStack(newStacks, stack) == null) {
@@ -45,9 +94,8 @@ public class StackUtil {
 	}
 
 	/* Returns an ItemStack from "stacks" if it isIdentical to an ItemStack from "contains" */
-	@Deprecated
 	@Nullable
-	public static ItemStack containsStack(@Nullable Iterable<ItemStack> stacks, @Nullable Iterable<ItemStack> contains) {
+	public ItemStack containsStack(@Nullable Iterable<ItemStack> stacks, @Nullable Iterable<ItemStack> contains) {
 		if (stacks == null || contains == null) {
 			return null;
 		}
@@ -63,9 +111,8 @@ public class StackUtil {
 	}
 
 	/* Returns an ItemStack from "stacks" if it isIdentical to "contains" */
-	@Deprecated
 	@Nullable
-	public static ItemStack containsStack(@Nullable Iterable<ItemStack> stacks, @Nullable ItemStack contains) {
+	public ItemStack containsStack(@Nullable Iterable<ItemStack> stacks, @Nullable ItemStack contains) {
 		if (stacks == null || contains == null) {
 			return null;
 		}
@@ -78,71 +125,7 @@ public class StackUtil {
 		return null;
 	}
 
-	@Deprecated
-	@Nonnull
-	public static List<ItemStack> condenseStacks(Collection<ItemStack> stacks) {
-		List<ItemStack> condensed = new ArrayList<>();
-
-		for (ItemStack stack : stacks) {
-			if (stack == null || stack.stackSize <= 0) {
-				continue;
-			}
-
-			boolean matched = false;
-			for (ItemStack cached : condensed) {
-				if (cached.isItemEqual(stack) && ItemStack.areItemStackTagsEqual(cached, stack)) {
-					cached.stackSize += stack.stackSize;
-					matched = true;
-				}
-			}
-
-			if (!matched) {
-				ItemStack cached = stack.copy();
-				condensed.add(cached);
-			}
-		}
-
-		return condensed;
-	}
-
-	/**
-	 * Counts how many full sets are contained in the passed stock.
-	 * Returns a list of matching stacks from set, or null if there aren't enough for a complete match.
-	 */
-	@Deprecated
-	@Nullable
-	public static List<ItemStack> containsSets(Collection<ItemStack> required, Collection<ItemStack> offered) {
-		int totalSets = 0;
-
-		List<ItemStack> matching = new ArrayList<>();
-		List<ItemStack> condensedRequired = condenseStacks(required);
-		List<ItemStack> condensedOffered = condenseStacks(offered);
-
-		for (ItemStack req : condensedRequired) {
-			int reqCount = 0;
-			for (ItemStack offer : condensedOffered) {
-				if (isIdentical(req, offer)) {
-					int stackCount = offer.stackSize / req.stackSize;
-					reqCount = Math.max(reqCount, stackCount);
-				}
-			}
-
-			if (reqCount == 0) {
-				return null;
-			} else {
-				matching.add(req);
-
-				if (totalSets == 0 || totalSets > reqCount) {
-					totalSets = reqCount;
-				}
-			}
-		}
-
-		return matching;
-	}
-
-	@Deprecated
-	public static boolean isIdentical(@Nullable ItemStack lhs, @Nullable ItemStack rhs) {
+	public boolean isIdentical(@Nullable ItemStack lhs, @Nullable ItemStack rhs) {
 		if (lhs == rhs) {
 			return true;
 		}
@@ -164,14 +147,17 @@ public class StackUtil {
 		return ItemStack.areItemStackTagsEqual(lhs, rhs);
 	}
 
-	/**
-	 * Returns all the subtypes of itemStack if it has a wildcard meta value.
-	 */
-	@Deprecated
+	@Override
 	@Nonnull
-	public static List<ItemStack> getSubtypes(@Nonnull ItemStack itemStack) {
+	public List<ItemStack> getSubtypes(@Nullable ItemStack itemStack) {
+		if (itemStack == null) {
+			Log.error("Null itemStack", new NullPointerException());
+			return Collections.emptyList();
+		}
+
 		Item item = itemStack.getItem();
 		if (item == null) {
+			Log.error("Null item in itemStack", new NullPointerException());
 			return Collections.emptyList();
 		}
 
@@ -182,9 +168,8 @@ public class StackUtil {
 		return getSubtypes(item, itemStack.stackSize);
 	}
 
-	@Deprecated
 	@Nonnull
-	public static List<ItemStack> getSubtypes(@Nonnull Item item, int stackSize) {
+	public List<ItemStack> getSubtypes(@Nonnull Item item, int stackSize) {
 		List<ItemStack> itemStacks = new ArrayList<>();
 
 		for (CreativeTabs itemTab : item.getCreativeTabs()) {
@@ -204,15 +189,20 @@ public class StackUtil {
 		return itemStacks;
 	}
 
-	@Deprecated
-	public static List<ItemStack> getAllSubtypes(Iterable stacks) {
+	@Override
+	@Nonnull
+	public List<ItemStack> getAllSubtypes(@Nullable Iterable stacks) {
+		if (stacks == null) {
+			Log.error("Null stacks", new NullPointerException());
+			return Collections.emptyList();
+		}
+
 		List<ItemStack> allSubtypes = new ArrayList<>();
 		getAllSubtypes(allSubtypes, stacks);
 		return allSubtypes;
 	}
 
-	@Deprecated
-	private static void getAllSubtypes(List<ItemStack> subtypesList, Iterable stacks) {
+	private void getAllSubtypes(@Nonnull List<ItemStack> subtypesList, @Nonnull Iterable stacks) {
 		for (Object obj : stacks) {
 			if (obj instanceof ItemStack) {
 				ItemStack itemStack = (ItemStack) obj;
@@ -226,16 +216,19 @@ public class StackUtil {
 		}
 	}
 
-	@Deprecated
+	@Override
 	@Nonnull
-	public static List<ItemStack> toItemStackList(@Nullable Object stacks) {
+	public List<ItemStack> toItemStackList(@Nullable Object stacks) {
+		if (stacks == null) {
+			return Collections.emptyList();
+		}
+
 		List<ItemStack> itemStacksList = new ArrayList<>();
 		toItemStackList(itemStacksList, stacks);
 		return removeDuplicateItemStacks(itemStacksList);
 	}
 
-	@Deprecated
-	private static void toItemStackList(@Nonnull List<ItemStack> itemStackList, @Nullable Object input) {
+	private void toItemStackList(@Nonnull List<ItemStack> itemStackList, @Nullable Object input) {
 		if (input instanceof ItemStack) {
 			itemStackList.add((ItemStack) input);
 		} else if (input instanceof String) {
@@ -250,15 +243,13 @@ public class StackUtil {
 		}
 	}
 
-	@Deprecated
 	@Nonnull
-	public static String getUniqueIdentifierForStack(@Nonnull ItemStack stack) {
+	public String getUniqueIdentifierForStack(@Nonnull ItemStack stack) {
 		return getUniqueIdentifierForStack(stack, false);
 	}
 
-	@Deprecated
 	@Nonnull
-	public static String getUniqueIdentifierForStack(@Nonnull ItemStack stack, boolean wildcard) {
+	public String getUniqueIdentifierForStack(@Nonnull ItemStack stack, boolean wildcard) {
 		Item item = stack.getItem();
 		if (item == null) {
 			throw new ItemUidException("Found an itemStack with a null item. This is an error from another mod.");
@@ -279,21 +270,19 @@ public class StackUtil {
 		StringBuilder itemKey = new StringBuilder(itemNameString);
 		if (stack.getHasSubtypes()) {
 			itemKey.append(':').append(metadata);
-		}
-
-		if (stack.hasTagCompound()) {
-			NBTTagCompound nbtTagCompound = Internal.getHelpers().getNbtIgnoreList().getNbt(stack);
-			if (nbtTagCompound != null && !nbtTagCompound.hasNoTags()) {
-				itemKey.append(':').append(nbtTagCompound);
+			if (stack.hasTagCompound()) {
+				NBTTagCompound nbtTagCompound = Internal.getHelpers().getNbtIgnoreList().getNbt(stack);
+				if (nbtTagCompound != null && !nbtTagCompound.hasNoTags()) {
+					itemKey.append(':').append(nbtTagCompound);
+				}
 			}
 		}
 
 		return itemKey.toString();
 	}
 
-	@Deprecated
 	@Nonnull
-	public static List<String> getUniqueIdentifiersWithWildcard(@Nonnull ItemStack itemStack) {
+	public List<String> getUniqueIdentifiersWithWildcard(@Nonnull ItemStack itemStack) {
 		String uid = getUniqueIdentifierForStack(itemStack, false);
 		String uidWild = getUniqueIdentifierForStack(itemStack, true);
 
@@ -304,8 +293,7 @@ public class StackUtil {
 		}
 	}
 
-	@Deprecated
-	public static int addStack(Container container, Collection<Integer> slotIndexes, ItemStack stack, boolean doAdd) {
+	public int addStack(@Nonnull Container container, @Nonnull Collection<Integer> slotIndexes, @Nonnull ItemStack stack, boolean doAdd) {
 		int added = 0;
 		// Add to existing stacks first
 		for (Integer slotIndex : slotIndexes) {
@@ -370,5 +358,12 @@ public class StackUtil {
 		}
 
 		return added;
+	}
+
+	public static class MatchingItemsResult {
+		@Nonnull
+		public final Map<Integer, ItemStack> matchingItems = new HashMap<>();
+		@Nonnull
+		public final List<Integer> missingItems = new ArrayList<>();
 	}
 }

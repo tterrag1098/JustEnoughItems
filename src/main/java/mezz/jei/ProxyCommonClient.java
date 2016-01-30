@@ -1,17 +1,27 @@
 package mezz.jei;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import mezz.jei.api.IModPlugin;
+import mezz.jei.config.Config;
+import mezz.jei.config.Constants;
+import mezz.jei.config.KeyBindings;
+import mezz.jei.gui.ItemListOverlay;
+import mezz.jei.network.packets.PacketJEI;
+import mezz.jei.plugins.vanilla.VanillaPlugin;
+import mezz.jei.util.AnnotatedInstanceUtil;
+import mezz.jei.util.Log;
+import mezz.jei.util.ModRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.client.resources.IReloadableResourceManager;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
-import net.minecraft.client.resources.SimpleReloadableResourceManager;
 import net.minecraft.nbt.NBTTagCompound;
-
 import net.minecraftforge.common.ForgeVersion;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.FMLClientHandler;
@@ -22,16 +32,6 @@ import net.minecraftforge.fml.common.event.FMLInterModComms;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-
-import mezz.jei.api.IModPlugin;
-import mezz.jei.config.Config;
-import mezz.jei.config.Constants;
-import mezz.jei.config.KeyBindings;
-import mezz.jei.gui.ItemListOverlay;
-import mezz.jei.network.packets.PacketJEI;
-import mezz.jei.util.AnnotatedInstanceUtil;
-import mezz.jei.util.Log;
-import mezz.jei.util.ModRegistry;
 
 public class ProxyCommonClient extends ProxyCommon {
 	private static boolean started = false;
@@ -55,6 +55,12 @@ public class ProxyCommonClient extends ProxyCommon {
 		ASMDataTable asmDataTable = event.getAsmData();
 		this.plugins = AnnotatedInstanceUtil.getModPlugins(asmDataTable);
 
+		IModPlugin vanillaPlugin = getVanillaPlugin(this.plugins);
+		if (vanillaPlugin != null) {
+			this.plugins.remove(vanillaPlugin);
+			this.plugins.add(0, vanillaPlugin);
+		}
+
 		Iterator<IModPlugin> iterator = plugins.iterator();
 		while (iterator.hasNext()) {
 			IModPlugin plugin = iterator.next();
@@ -68,11 +74,25 @@ public class ProxyCommonClient extends ProxyCommon {
 			}
 		}
 
-		// Prevent localized caches from being out of date
-		((SimpleReloadableResourceManager) Minecraft.getMinecraft().getResourceManager()).registerReloadListener(new IResourceManagerReloadListener() {
+		// Reload when localization changes
+		Minecraft minecraft = Minecraft.getMinecraft();
+		IReloadableResourceManager reloadableResourceManager = (IReloadableResourceManager) minecraft.getResourceManager();
+		reloadableResourceManager.registerReloadListener(new IResourceManagerReloadListener() {
 			@Override
-			public void onResourceManagerReload(IResourceManager resourceManager) { restartJEI(); }
+			public void onResourceManagerReload(IResourceManager resourceManager) {
+				restartJEI();
+			}
 		});
+	}
+
+	@Nullable
+	private IModPlugin getVanillaPlugin(List<IModPlugin> modPlugins) {
+		for (IModPlugin modPlugin : modPlugins) {
+			if (modPlugin instanceof VanillaPlugin) {
+				return modPlugin;
+			}
+		}
+		return null;
 	}
 
 	@Override

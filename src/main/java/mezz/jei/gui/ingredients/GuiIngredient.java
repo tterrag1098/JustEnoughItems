@@ -34,7 +34,9 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 	@Nonnull
 	private final CycleTimer cycleTimer;
 	@Nonnull
-	private final List<T> contained = new ArrayList<>();
+	private final List<T> contained = new ArrayList<>(); // contained, taking focus into account
+	@Nonnull
+	private final List<T> allContained = new ArrayList<>(); // contained, ignoring focus
 	@Nonnull
 	private final IIngredientRenderer<T> ingredientRenderer;
 	@Nonnull
@@ -80,7 +82,7 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 	@Nonnull
 	@Override
 	public List<T> getAll() {
-		return contained;
+		return allContained;
 	}
 
 	@Override
@@ -91,6 +93,7 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 	@Override
 	public void set(@Nonnull Collection<T> contained, @Nonnull Focus focus) {
 		this.contained.clear();
+		this.allContained.clear();
 		contained = ingredientHelper.expandSubtypes(contained);
 		T match = null;
 		if ((isInput() && focus.getMode() == Focus.Mode.INPUT) || (!isInput() && focus.getMode() == Focus.Mode.OUTPUT)) {
@@ -101,6 +104,7 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 		} else {
 			this.contained.addAll(contained);
 		}
+		this.allContained.addAll(contained);
 		enabled = !this.contained.isEmpty();
 	}
 
@@ -128,9 +132,10 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 
 	@Override
 	public void drawHighlight(@Nonnull Minecraft minecraft, Color color, int xOffset, int yOffset) {
-		int x = xPosition + xOffset;
-		int y = yPosition + yOffset;
-		GuiScreen.drawRect(x, y, x + width, y + height, color.getRGB());
+		int x = xPosition + xOffset + padding;
+		int y = yPosition + yOffset + padding;
+		GlStateManager.disableLighting();
+		GuiScreen.drawRect(x, y, x + width - padding * 2, y + height - padding * 2, color.getRGB());
 	}
 
 	private void drawTooltip(@Nonnull Minecraft minecraft, int mouseX, int mouseY, @Nonnull T value) {
@@ -138,7 +143,7 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 			GlStateManager.disableDepth();
 
 			RenderHelper.disableStandardItemLighting();
-			drawRect(xPosition, yPosition, xPosition + width, yPosition + height, 0x7FFFFFFF);
+			drawRect(xPosition + padding, yPosition + padding, xPosition + width - padding, yPosition + height - padding, 0x7FFFFFFF);
 
 			List<String> tooltip = ingredientRenderer.getTooltip(minecraft, value);
 
@@ -155,6 +160,7 @@ public class GuiIngredient<T> extends Gui implements IGuiIngredient<T> {
 		}
 	}
 
+	@Override
 	public boolean isInput() {
 		return input;
 	}

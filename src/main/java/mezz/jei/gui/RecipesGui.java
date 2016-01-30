@@ -166,6 +166,13 @@ public class RecipesGui extends GuiScreen implements IShowsRecipeFocuses, IMouse
 		}
 
 		if (!guiActionPerformed) {
+			Minecraft minecraft = Minecraft.getMinecraft();
+			for (RecipeLayout recipeLayout : recipeLayouts) {
+				if (recipeLayout.handleClick(minecraft, mouseX, mouseY, mouseButton)) {
+					return true;
+				}
+			}
+
 			if (titleHoverChecker.checkHover(mouseX, mouseY)) {
 				boolean success = logic.setCategoryFocus();
 				if (success) {
@@ -227,6 +234,13 @@ public class RecipesGui extends GuiScreen implements IShowsRecipeFocuses, IMouse
 		}
 	}
 
+	public void showCategories(@Nonnull List<String> recipeCategoryUids) {
+		if (logic.setCategoryFocus(recipeCategoryUids)) {
+			updateLayout();
+			open();
+		}
+	}
+
 	public void back() {
 		if (logic.back()) {
 			updateLayout();
@@ -248,7 +262,8 @@ public class RecipesGui extends GuiScreen implements IShowsRecipeFocuses, IMouse
 		} else if (guibutton.id >= RecipeLayout.recipeTransferButtonIndex) {
 			int recipeIndex = guibutton.id - RecipeLayout.recipeTransferButtonIndex;
 			RecipeLayout recipeLayout = recipeLayouts.get(recipeIndex);
-			if (RecipeTransferUtil.transferRecipe(recipeLayout, Minecraft.getMinecraft().thePlayer)) {
+			boolean maxTransfer = GuiScreen.isShiftKeyDown();
+			if (RecipeTransferUtil.transferRecipe(recipeLayout, Minecraft.getMinecraft().thePlayer, maxTransfer)) {
 				close();
 				guiActionPerformed = true;
 				updateLayout = false;
